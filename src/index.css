@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium
+           transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+           focus-visible:ring-offset-slate-950;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-500;
+  }
+  .btn-secondary {
+    @apply btn bg-slate-800 text-slate-100 hover:bg-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent text-slate-300 hover:bg-slate-800;
+  }
+  .btn-danger {
+    @apply btn bg-rose-600 text-white hover:bg-rose-500;
+  }
+  .card {
+    @apply rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur p-6 shadow-lg;
+  }
+  .input {
+    @apply w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-lg text-slate-100
+           placeholder-slate-500 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30
+           transition;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+}
+
+/* Light mode overrides */
+html:not(.dark) body {
+  @apply bg-slate-50 text-slate-900;
+}
+html:not(.dark) .card {
+  @apply bg-white border-slate-200;
+}
+html:not(.dark) .input {
+  @apply bg-white border-slate-300 text-slate-900 placeholder-slate-400;
+}
+html:not(.dark) .btn-secondary {
+  @apply bg-slate-200 text-slate-900 hover:bg-slate-300;
+}
+html:not(.dark) .btn-ghost {
+  @apply text-slate-700 hover:bg-slate-200;
+}
+
+/* Reduce iOS input zoom */
+@supports (-webkit-touch-callout: none) {
+  input, textarea {
+    font-size: 16px;
+  }
+}
+
+/* Subtle scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.5); }
