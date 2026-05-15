@@ -28,7 +28,7 @@ export function DifficultReview() {
   const [input, setInput] = useState('')
   const [feedback, setFeedback] = useState<'idle' | 'correct' | 'wrong' | 'revealed'>('idle')
   const [wrongCount, setWrongCount] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
   const advanceTimerRef = useRef<number | null>(null)
   const shakeControls = useAnimationControls()
 
