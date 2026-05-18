@@ -13,12 +13,14 @@ interface SettingsState {
   speechVoiceURI: string
   autoPlaySound: boolean
   speakMode: SpeakMode
+  speechStrictness: number
   toggleTheme: () => void
   setDesktopMode: (m: DesktopMode) => void
   setSpeechRate: (r: number) => void
   setAutoPlaySound: (v: boolean) => void
   setSpeakMode: (m: SpeakMode) => void
   setSpeechVoiceURI: (uri: string) => void
+  setSpeechStrictness: (value: number) => void
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -31,12 +33,14 @@ export const useSettingsStore = create<SettingsState>()(
       speechVoiceURI: '',
       autoPlaySound: false,
       speakMode: 'sentence',
+      speechStrictness: 0.8,
       toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
       setDesktopMode: (m) => set({ desktopMode: m }),
       setSpeechRate: (r) => set({ speechRate: r }),
       setAutoPlaySound: (v) => set({ autoPlaySound: v }),
       setSpeakMode: (m) => set({ speakMode: m }),
-      setSpeechVoiceURI: (uri) => set({ speechVoiceURI: uri })
+      setSpeechVoiceURI: (uri) => set({ speechVoiceURI: uri }),
+      setSpeechStrictness: (value) => set({ speechStrictness: value })
     }),
     { name: 'ai-settings' }
   )

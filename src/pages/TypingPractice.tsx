@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Bookmark, Check, Eye, RotateCcw, Volume2, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bookmark, Check, Eye, EyeOff, RotateCcw, Volume2, X } from 'lucide-react'
 import { useWordsStore } from '../store/useWordsStore'
 import { useProgressStore } from '../store/useProgressStore'
 import { useSettingsStore } from '../store/useSettingsStore'
@@ -9,7 +9,9 @@ import { useSpeak } from '../hooks/useSpeak'
 import { useShortcuts } from '../hooks/useShortcuts'
 import { normalize } from '../utils/normalize'
 import { buildHint } from '../utils/hint'
+import { shuffleArray } from '../utils/shuffle'
 import { ProgressBar } from '../components/ProgressBar'
+import { PracticeSummary } from '../components/PracticeSummary'
 
 const MAX_WRONG_BEFORE_REVEAL = 3
 const AUTO_ADVANCE_MS = 600
@@ -25,11 +27,14 @@ export function TypingPractice() {
   const [input, setInput] = useState('')
   const [feedback, setFeedback] = useState<'idle' | 'correct' | 'wrong' | 'revealed'>('idle')
   const [wrongCount, setWrongCount] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [showSummary, setShowSummary] = useState(false)
+  const [showIPA, setShowIPA] = useState(true)
+  const inputRef = useRef<HTMLInputElement | null>(null)
   const advanceTimerRef = useRef<number | null>(null)
   const shakeControls = useAnimationControls()
 
-  const currentWordId = batch?.wordIds[position] ?? -1
+  const shuffledWordIds = useMemo(() => (batch ? shuffleArray(batch.wordIds) : []), [batch])
+  const currentWordId = shuffledWordIds[position] ?? -1
 
   const recordTyping = useProgressStore((s) => s.recordTyping)
   const toggleHard = useProgressStore((s) => s.toggleHard)
@@ -40,9 +45,9 @@ export function TypingPractice() {
 
   const word = useMemo(() => {
     if (!batch) return null
-    const id = batch.wordIds[position]
-    return byId.get(id) ?? null
-  }, [batch, byId, position])
+    const id = shuffledWordIds[position]
+    return id ? byId.get(id) ?? null : null
+  }, [batch, byId, position, shuffledWordIds])
 
   const clearAdvanceTimer = useCallback(() => {
     if (advanceTimerRef.current !== null) {
@@ -50,6 +55,36 @@ export function TypingPractice() {
       advanceTimerRef.current = null
     }
   }, [])
+
+  const progress = useProgressStore((s) => s.progress)
+  const summary = useMemo(() => {
+    if (!batch) return null
+    let reviewed = 0
+    let correct = 0
+    let hard = 0
+    let attempts = 0
+    let lastScoreTotal = 0
+    for (const id of batch.wordIds) {
+      const p = progress[id]
+      if (!p || p.attempts === 0) continue
+      reviewed++
+      attempts += p.attempts
+      if ((p.lastScore ?? 0) >= 0.75) correct++
+      lastScoreTotal += p.lastScore ?? 0
+      if (p.isHard) hard++
+    }
+    const skipped = batch.wordIds.length - reviewed
+    const average = reviewed > 0 ? Math.round((lastScoreTotal / reviewed) * 100) : 0
+    return {
+      total: batch.wordIds.length,
+      reviewed,
+      correct,
+      skipped,
+      hard,
+      attempts,
+      average
+    }
+  }, [batch, progress])
 
   // Reset state on word change. Focus is handled via callback ref + onAnimationComplete
   // because the input is inside an AnimatePresence and only mounts after the previous
@@ -83,9 +118,13 @@ export function TypingPractice() {
 
   const next = useCallback(() => {
     if (!batch) return
+    if (position >= batch.wordIds.length - 1) {
+      navigate('/')
+      return
+    }
     clearAdvanceTimer()
     setPosition((p) => Math.min(batch.wordIds.length - 1, p + 1))
-  }, [batch, clearAdvanceTimer])
+  }, [batch, clearAdvanceTimer, navigate, position])
 
   const prev = useCallback(() => {
     clearAdvanceTimer()
@@ -165,6 +204,30 @@ export function TypingPractice() {
       </div>
     )
   }
+
+  if (showSummary && summary) {
+    return (
+      <PracticeSummary
+        title={batch.label}
+        total={summary.total}
+        reviewed={summary.reviewed}
+        correct={summary.correct}
+        skipped={summary.skipped}
+        hard={summary.hard}
+        average={summary.average}
+        attempts={summary.attempts}
+        onRestart={() => {
+          setShowSummary(false)
+          setPosition(0)
+          setInput('')
+          setFeedback('idle')
+          setWrongCount(0)
+        }}
+        onHome={() => navigate('/')}
+      />
+    )
+  }
+
   if (!word) return null
 
   const ratio = (position + 1) / batch.wordIds.length
@@ -186,23 +249,33 @@ export function TypingPractice() {
         <div className="text-sm text-slate-400">
           {batch.label} · {position + 1}/{batch.wordIds.length}
         </div>
-        <motion.button
-          onClick={() => toggleHard(word.id)}
-          className={`btn ${isHard ? 'bg-amber-500 text-slate-900 hover:bg-amber-400' : 'btn-ghost'}`}
-          title="Marcar como difícil (M)"
-          whileTap={{ scale: 0.85 }}
-        >
-          <motion.span
-            key={String(isHard)}
-            initial={{ scale: 0.6, rotate: -15 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 450, damping: 14 }}
-            className="flex items-center"
+        <div className="flex items-center gap-2">
+          <motion.button
+            onClick={() => setShowIPA((prev) => !prev)}
+            className="btn-ghost"
+            title={showIPA ? 'Ocultar IPA' : 'Mostrar IPA'}
+            whileTap={{ scale: 0.85 }}
           >
-            <Bookmark className="h-4 w-4" fill={isHard ? 'currentColor' : 'none'} />
-          </motion.span>
-          <span className="hidden sm:inline">{isHard ? 'Difícil' : 'Marcar'}</span>
-        </motion.button>
+            {showIPA ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          </motion.button>
+          <motion.button
+            onClick={() => toggleHard(word.id)}
+            className={`btn ${isHard ? 'bg-amber-500 text-slate-900 hover:bg-amber-400' : 'btn-ghost'}`}
+            title="Marcar como difícil (M)"
+            whileTap={{ scale: 0.85 }}
+          >
+            <motion.span
+              key={String(isHard)}
+              initial={{ scale: 0.6, rotate: -15 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 450, damping: 14 }}
+              className="flex items-center"
+            >
+              <Bookmark className="h-4 w-4" fill={isHard ? 'currentColor' : 'none'} />
+            </motion.span>
+            <span className="hidden sm:inline">{isHard ? 'Difícil' : 'Marcar'}</span>
+          </motion.button>
+        </div>
       </div>
 
       <ProgressBar value={ratio} />
@@ -225,7 +298,7 @@ export function TypingPractice() {
         >
           <div className="text-xs uppercase tracking-widest text-slate-400">Español</div>
           <div className="mt-1 text-3xl font-bold">{word.spanish}</div>
-          {word.ipa && <div className="mt-2 font-mono text-lg text-brand-300">{word.ipa}</div>}
+          {showIPA && word.ipa && <div className="mt-2 font-mono text-lg text-brand-300">{word.ipa}</div>}
 
           {wrongCount > 0 && wrongCount < MAX_WRONG_BEFORE_REVEAL && (
             <AnimatePresence mode="wait">
@@ -330,7 +403,7 @@ export function TypingPractice() {
                   </button>
                 )}
                 <button onClick={next} className="btn-primary">
-                  Siguiente <ArrowRight className="h-4 w-4" />
+                  {position >= batch.wordIds.length - 1 ? 'Finalizar' : 'Siguiente'} <ArrowRight className="h-4 w-4" />
                 </button>
               </>
             )}
@@ -352,8 +425,8 @@ export function TypingPractice() {
         <div className="hidden text-xs text-slate-500 sm:block">
           Enter · Ctrl+← → navegar · M marcar · Esc salir
         </div>
-        <button onClick={next} disabled={position >= batch.wordIds.length - 1} className="btn-secondary">
-          Siguiente <ArrowRight className="h-4 w-4" />
+        <button onClick={next} className="btn-secondary">
+          {position >= batch.wordIds.length - 1 ? 'Finalizar' : 'Siguiente'} <ArrowRight className="h-4 w-4" />
         </button>
       </div>
     </div>

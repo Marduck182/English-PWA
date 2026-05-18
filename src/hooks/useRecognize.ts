@@ -149,7 +149,7 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
     const rec = new Ctor()
     rec.lang = lang
     rec.interimResults = true
-    rec.continuous = false
+    rec.continuous = true
     rec.maxAlternatives = 1
 
     rec.onstart = () => setListening(true)

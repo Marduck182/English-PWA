@@ -17,6 +17,8 @@ export function Settings() {
   const setSpeechRate = useSettingsStore((s) => s.setSpeechRate)
   const speechVoiceURI = useSettingsStore((s) => s.speechVoiceURI)
   const setSpeechVoiceURI = useSettingsStore((s) => s.setSpeechVoiceURI)
+  const speechStrictness = useSettingsStore((s) => s.speechStrictness)
+  const setSpeechStrictness = useSettingsStore((s) => s.setSpeechStrictness)
 
   const { voices, speak } = useSpeak()
   const englishVoices = voices.filter((v) => v.lang.startsWith('en'))
@@ -161,6 +163,31 @@ export function Settings() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-800/60" />
+
+        <div className="py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium">Sensibilidad de pronunciación</div>
+              <div className="text-xs text-slate-400">Cuánto debe coincidir la pronunciación para avanzar.</div>
+            </div>
+            <div className="text-xs font-mono text-brand-300">{Math.round(speechStrictness * 100)}%</div>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-[10px] text-slate-500">Flexible</span>
+            <input
+              type="range"
+              min={0.6}
+              max={1}
+              step={0.05}
+              value={speechStrictness}
+              onChange={(e) => setSpeechStrictness(Number(e.target.value))}
+              className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-slate-700 accent-brand-500"
+            />
+            <span className="text-[10px] text-slate-500">Estricto</span>
           </div>
         </div>
 

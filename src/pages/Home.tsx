@@ -9,7 +9,7 @@ export function Home() {
   const progress = useProgressStore((s) => s.progress)
   const { isMobile, recognitionSupported } = useDevice()
 
-  const totalHard = Object.values(progress).filter((p) => p.isHard).length
+  const totalHard = Object.values(progress).filter((item) => item.isHard).length
 
   if (loading || !loaded) {
     return (

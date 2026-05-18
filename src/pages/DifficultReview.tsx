@@ -9,7 +9,9 @@ import { useSpeak } from '../hooks/useSpeak'
 import { useShortcuts } from '../hooks/useShortcuts'
 import { normalize } from '../utils/normalize'
 import { buildHint } from '../utils/hint'
+import { shuffleArray } from '../utils/shuffle'
 import { ProgressBar } from '../components/ProgressBar'
+import { PracticeSummary } from '../components/PracticeSummary'
 import type { Word } from '../types'
 
 const MAX_WRONG_BEFORE_REVEAL = 3
@@ -28,7 +30,8 @@ export function DifficultReview() {
   const [input, setInput] = useState('')
   const [feedback, setFeedback] = useState<'idle' | 'correct' | 'wrong' | 'revealed'>('idle')
   const [wrongCount, setWrongCount] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [showSummary, setShowSummary] = useState(false)
+  const inputRef = useRef<HTMLInputElement | null>(null)
   const advanceTimerRef = useRef<number | null>(null)
   const shakeControls = useAnimationControls()
 
@@ -42,7 +45,45 @@ export function DifficultReview() {
     return out
   }, [progress, byId])
 
-  const word = hardWords[position] ?? null
+  const hardWordsKey = useMemo(() => hardWords.map((w) => w.id).join(','), [hardWords])
+  const [shuffledHardWords, setShuffledHardWords] = useState<Word[]>([])
+
+  useEffect(() => {
+    setShuffledHardWords(shuffleArray(hardWords))
+    setPosition(0)
+  }, [hardWordsKey])
+
+  const word = shuffledHardWords[position] ?? null
+
+  const summary = useMemo(() => {
+    let reviewed = 0
+    let correct = 0
+    let hard = hardWords.length
+    let attempts = 0
+    let lastScoreTotal = 0
+
+    for (const item of hardWords) {
+      const p = progress[item.id]
+      if (!p || p.attempts === 0) continue
+      reviewed++
+      attempts += p.attempts
+      if ((p.lastScore ?? 0) >= 0.75) correct++
+      lastScoreTotal += p.lastScore ?? 0
+    }
+
+    const skipped = hardWords.length - reviewed
+    const average = reviewed > 0 ? Math.round((lastScoreTotal / reviewed) * 100) : 0
+
+    return {
+      total: hardWords.length,
+      reviewed,
+      correct,
+      skipped,
+      hard,
+      attempts,
+      average
+    }
+  }, [hardWords, progress])
 
   const clearAdvanceTimer = useCallback(() => {
     if (advanceTimerRef.current !== null) {
@@ -74,9 +115,13 @@ export function DifficultReview() {
   }, [])
 
   const next = useCallback(() => {
+    if (position >= shuffledHardWords.length - 1) {
+      setShowSummary(true)
+      return
+    }
     clearAdvanceTimer()
-    setPosition((p) => Math.min(hardWords.length - 1, p + 1))
-  }, [hardWords.length, clearAdvanceTimer])
+    setPosition((p) => Math.min(shuffledHardWords.length - 1, p + 1))
+  }, [shuffledHardWords.length, clearAdvanceTimer, position])
 
   const prev = useCallback(() => {
     clearAdvanceTimer()
@@ -120,8 +165,8 @@ export function DifficultReview() {
   const handleUnmark = useCallback(() => {
     if (!word) return
     markHard(word.id, false)
-    setPosition((p) => Math.min(p, Math.max(0, hardWords.length - 2)))
-  }, [word, markHard, hardWords.length])
+    setPosition((p) => Math.min(p, Math.max(0, shuffledHardWords.length - 2)))
+  }, [word, markHard, shuffledHardWords.length])
 
   const shortcuts = useMemo(
     () => ({
@@ -153,9 +198,32 @@ export function DifficultReview() {
     )
   }
 
+  if (showSummary && summary) {
+    return (
+      <PracticeSummary
+        title="Repaso difícil"
+        total={summary.total}
+        reviewed={summary.reviewed}
+        correct={summary.correct}
+        skipped={summary.skipped}
+        hard={summary.hard}
+        average={summary.average}
+        attempts={summary.attempts}
+        onRestart={() => {
+          setShowSummary(false)
+          setPosition(0)
+          setInput('')
+          setFeedback('idle')
+          setWrongCount(0)
+        }}
+        onHome={() => navigate('/')}
+      />
+    )
+  }
+
   if (!word) return null
 
-  const ratio = (position + 1) / hardWords.length
+  const ratio = shuffledHardWords.length > 0 ? (position + 1) / shuffledHardWords.length : 0
   const inputDisabled = feedback === 'correct' || feedback === 'revealed'
   const inputBorderClass =
     feedback === 'correct'
@@ -297,12 +365,8 @@ export function DifficultReview() {
                     <RotateCcw className="h-4 w-4" /> Reintentar
                   </button>
                 )}
-                <button
-                  onClick={next}
-                  disabled={position >= hardWords.length - 1}
-                  className="btn-primary"
-                >
-                  Siguiente <ArrowRight className="h-4 w-4" />
+                <button onClick={next} className="btn-primary">
+                  {position >= shuffledHardWords.length - 1 ? 'Finalizar' : 'Siguiente'} <ArrowRight className="h-4 w-4" />
                 </button>
               </>
             )}
@@ -324,8 +388,8 @@ export function DifficultReview() {
         <div className="hidden text-xs text-slate-500 sm:block">
           Enter · Ctrl+← → navegar · Esc salir
         </div>
-        <button onClick={next} disabled={position >= hardWords.length - 1} className="btn-secondary">
-          Siguiente <ArrowRight className="h-4 w-4" />
+        <button onClick={next} className="btn-secondary">
+          {position >= shuffledHardWords.length - 1 ? 'Finalizar' : 'Siguiente'} <ArrowRight className="h-4 w-4" />
         </button>
       </div>
     </div>

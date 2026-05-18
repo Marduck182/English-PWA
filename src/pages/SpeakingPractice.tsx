@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Bookmark, Mic, MicOff, RotateCcw, Volume2 } from 'lucide-react'
 import { useWordsStore } from '../store/useWordsStore'
@@ -9,6 +9,8 @@ import { useSpeak } from '../hooks/useSpeak'
 import { useRecognize } from '../hooks/useRecognize'
 import { useShortcuts } from '../hooks/useShortcuts'
 import { ProgressBar } from '../components/ProgressBar'
+import { PracticeSummary } from '../components/PracticeSummary'
+import { shuffleArray } from '../utils/shuffle'
 import { sentenceSimilarity, scoreToPercent, scoreLabel } from '../utils/similarity'
 
 export function SpeakingPractice() {
@@ -21,24 +23,74 @@ export function SpeakingPractice() {
   const [position, setPosition] = useState(0)
   const [score, setScore] = useState<number | null>(null)
   const [showAnswer, setShowAnswer] = useState(false)
+  const [showSummary, setShowSummary] = useState(false)
+  const autoAdvanceTimerRef = useRef<number | null>(null)
 
-  const currentWordId = batch?.wordIds[position] ?? -1
+  const shuffledWordIds = useMemo(() => (batch ? shuffleArray(batch.wordIds) : []), [batch])
+  const currentWordId = shuffledWordIds[position] ?? -1
 
   const recordSpeaking = useProgressStore((s) => s.recordSpeaking)
   const toggleHard = useProgressStore((s) => s.toggleHard)
   const isHard = useProgressStore((s) => s.progress[currentWordId]?.isHard ?? false)
   const speakMode = useSettingsStore((s) => s.speakMode)
+  const speechStrictness = useSettingsStore((s) => s.speechStrictness)
   const { speak, speaking, supported: ttsSupported } = useSpeak()
 
   const word = useMemo(() => {
     if (!batch) return null
-    const id = batch.wordIds[position]
-    return byId.get(id) ?? null
-  }, [batch, byId, position])
+    const id = shuffledWordIds[position]
+    return id ? byId.get(id) ?? null : null
+  }, [batch, byId, position, shuffledWordIds])
 
   const target = speakMode === 'word'
     ? (word?.english || '')
     : (word?.sentence || word?.english || '')
+
+  const progress = useProgressStore((s) => s.progress)
+  const summary = useMemo(() => {
+    if (!batch) return null
+    let reviewed = 0
+    let correct = 0
+    let hard = 0
+    let attempts = 0
+    let lastScoreTotal = 0
+    for (const id of batch.wordIds) {
+      const p = progress[id]
+      if (!p || p.attempts === 0) continue
+      reviewed++
+      attempts += p.attempts
+      if ((p.lastScore ?? 0) >= 0.75) correct++
+      lastScoreTotal += p.lastScore ?? 0
+      if (p.isHard) hard++
+    }
+    const skipped = batch.wordIds.length - reviewed
+    const average = reviewed > 0 ? Math.round((lastScoreTotal / reviewed) * 100) : 0
+    return {
+      total: batch.wordIds.length,
+      reviewed,
+      correct,
+      skipped,
+      hard,
+      attempts,
+      average
+    }
+  }, [batch, progress])
+
+  const next = useCallback(() => {
+    if (!batch) return
+    if (position >= batch.wordIds.length - 1) {
+      setShowSummary(true)
+      return
+    }
+    setPosition((p) => Math.min(batch.wordIds.length - 1, p + 1))
+  }, [batch, position])
+
+  const clearAutoAdvanceTimer = useCallback(() => {
+    if (autoAdvanceTimerRef.current !== null) {
+      window.clearTimeout(autoAdvanceTimerRef.current)
+      autoAdvanceTimerRef.current = null
+    }
+  }, [])
 
   const onResult = useCallback(
     (text: string, isFinal: boolean) => {
@@ -46,23 +98,26 @@ export function SpeakingPractice() {
       const s = sentenceSimilarity(text, target)
       setScore(s)
       recordSpeaking(word.id, s)
+      if (s >= speechStrictness) {
+        clearAutoAdvanceTimer()
+        autoAdvanceTimerRef.current = window.setTimeout(next, 500)
+      }
     },
-    [word, target, recordSpeaking]
+    [word, target, recordSpeaking, next, clearAutoAdvanceTimer]
   )
 
   const { start, stop, reset, listening, transcript, interim, error, supported } = useRecognize({ onResult })
+
+  useEffect(() => clearAutoAdvanceTimer, [clearAutoAdvanceTimer])
 
   useEffect(() => {
     setScore(null)
     setShowAnswer(false)
     reset()
     stop()
-  }, [position, reset, stop])
+    clearAutoAdvanceTimer()
+  }, [position, reset, stop, clearAutoAdvanceTimer])
 
-  const next = useCallback(() => {
-    if (!batch) return
-    setPosition((p) => Math.min(batch.wordIds.length - 1, p + 1))
-  }, [batch])
   const prev = useCallback(() => setPosition((p) => Math.max(0, p - 1)), [])
   const retry = useCallback(() => {
     setScore(null)
@@ -103,6 +158,30 @@ export function SpeakingPractice() {
       </div>
     )
   }
+
+  if (showSummary && summary) {
+    return (
+      <PracticeSummary
+        title={batch.label}
+        total={summary.total}
+        reviewed={summary.reviewed}
+        correct={summary.correct}
+        skipped={summary.skipped}
+        hard={summary.hard}
+        average={summary.average}
+        attempts={summary.attempts}
+        onRestart={() => {
+          setShowSummary(false)
+          setPosition(0)
+          setScore(null)
+          setShowAnswer(false)
+          reset()
+        }}
+        onHome={() => navigate('/')}
+      />
+    )
+  }
+
   if (!word) return null
 
   const ratio = (position + 1) / batch.wordIds.length
@@ -253,8 +332,8 @@ export function SpeakingPractice() {
         <div className="hidden text-xs text-slate-500 sm:block">
           Enter grabar · Espacio escuchar · ← → navegar · M marcar
         </div>
-        <button onClick={next} disabled={position >= batch.wordIds.length - 1} className="btn-secondary">
-          Siguiente <ArrowRight className="h-4 w-4" />
+        <button onClick={next} className="btn-secondary">
+          {position >= batch.wordIds.length - 1 ? 'Finalizar' : 'Siguiente'} <ArrowRight className="h-4 w-4" />
         </button>
       </div>
     </div>
