@@ -18,6 +18,7 @@ interface SettingsState {
   showIPA: boolean
   showBatchList: boolean
   pronunciationSource: PronunciationSource
+  autoShowPronunciation: boolean
   toggleTheme: () => void
   setDesktopMode: (m: DesktopMode) => void
   setSpeechRate: (r: number) => void
@@ -28,6 +29,7 @@ interface SettingsState {
   setShowIPA: (v: boolean) => void
   setShowBatchList: (v: boolean) => void
   setPronunciationSource: (v: PronunciationSource) => void
+  setAutoShowPronunciation: (v: boolean) => void
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -44,6 +46,7 @@ export const useSettingsStore = create<SettingsState>()(
       showIPA: true,
       showBatchList: false,
       pronunciationSource: 'ipa',
+      autoShowPronunciation: false,
       toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
       setDesktopMode: (m) => set({ desktopMode: m }),
       setSpeechRate: (r) => set({ speechRate: r }),
@@ -53,7 +56,8 @@ export const useSettingsStore = create<SettingsState>()(
       setSpeechStrictness: (value) => set({ speechStrictness: value }),
       setShowIPA: (v) => set({ showIPA: v }),
       setShowBatchList: (v) => set({ showBatchList: v }),
-      setPronunciationSource: (v) => set({ pronunciationSource: v })
+      setPronunciationSource: (v) => set({ pronunciationSource: v }),
+      setAutoShowPronunciation: (v) => set({ autoShowPronunciation: v })
     }),
     { name: 'ai-settings' }
   )

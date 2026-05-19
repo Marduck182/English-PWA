@@ -21,6 +21,8 @@ export function Settings() {
   const setSpeechStrictness = useSettingsStore((s) => s.setSpeechStrictness)
   const pronunciationSource = useSettingsStore((s) => s.pronunciationSource)
   const setPronunciationSource = useSettingsStore((s) => s.setPronunciationSource)
+  const autoShowPronunciation = useSettingsStore((s) => s.autoShowPronunciation)
+  const setAutoShowPronunciation = useSettingsStore((s) => s.setAutoShowPronunciation)
 
   const { voices, speak } = useSpeak()
   const englishVoices = voices.filter((v) => v.lang.startsWith('en'))
@@ -157,6 +159,16 @@ export function Settings() {
               IA
             </button>
           </div>
+        </SettingRow>
+
+        <div className="border-t border-slate-800/60" />
+
+        <SettingRow
+          icon={<Languages className="h-5 w-5 text-slate-400" />}
+          label="Mostrar pronunciación automáticamente"
+          description="Se muestra al cargar cada palabra sin presionar el botón"
+        >
+          <Toggle checked={autoShowPronunciation} onChange={setAutoShowPronunciation} />
         </SettingRow>
 
         <div className="border-t border-slate-800/60" />
