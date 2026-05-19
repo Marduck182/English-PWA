@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Moon, Sun, Volume2, Download, Upload, CheckCircle2, AlertCircle, MessageSquareText, Type, Gauge, Play, UserRound } from 'lucide-react'
+import { Moon, Sun, Volume2, Download, Upload, CheckCircle2, AlertCircle, MessageSquareText, Type, Gauge, Languages, Play, UserRound } from 'lucide-react'
 import { useSettingsStore } from '../store/useSettingsStore'
 import { useProgressStore } from '../store/useProgressStore'
 import type { WordProgress } from '../store/useProgressStore'
@@ -19,6 +19,8 @@ export function Settings() {
   const setSpeechVoiceURI = useSettingsStore((s) => s.setSpeechVoiceURI)
   const speechStrictness = useSettingsStore((s) => s.speechStrictness)
   const setSpeechStrictness = useSettingsStore((s) => s.setSpeechStrictness)
+  const pronunciationSource = useSettingsStore((s) => s.pronunciationSource)
+  const setPronunciationSource = useSettingsStore((s) => s.setPronunciationSource)
 
   const { voices, speak } = useSpeak()
   const englishVoices = voices.filter((v) => v.lang.startsWith('en'))
@@ -122,6 +124,37 @@ export function Settings() {
               }`}
             >
               Frase
+            </button>
+          </div>
+        </SettingRow>
+
+        <div className="border-t border-slate-800/60" />
+
+        <SettingRow
+          icon={<Languages className="h-5 w-5 text-slate-400" />}
+          label="Fuente de pronunciación en español"
+          description={pronunciationSource === 'ipa' ? 'IPA local — instantáneo, basado en fonética' : 'IA (Groq) — más natural, requiere internet'}
+        >
+          <div className="flex gap-1 rounded-lg bg-slate-800 p-1">
+            <button
+              onClick={() => setPronunciationSource('ipa')}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                pronunciationSource === 'ipa'
+                  ? 'bg-brand-600 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              IPA
+            </button>
+            <button
+              onClick={() => setPronunciationSource('ai')}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                pronunciationSource === 'ai'
+                  ? 'bg-brand-600 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              IA
             </button>
           </div>
         </SettingRow>

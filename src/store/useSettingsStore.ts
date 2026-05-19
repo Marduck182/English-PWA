@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware'
 export type Theme = 'dark' | 'light'
 export type DesktopMode = 'typing' | 'speaking'
 export type SpeakMode = 'word' | 'sentence'
+export type PronunciationSource = 'ipa' | 'ai'
 
 interface SettingsState {
   theme: Theme
@@ -14,6 +15,9 @@ interface SettingsState {
   autoPlaySound: boolean
   speakMode: SpeakMode
   speechStrictness: number
+  showIPA: boolean
+  showBatchList: boolean
+  pronunciationSource: PronunciationSource
   toggleTheme: () => void
   setDesktopMode: (m: DesktopMode) => void
   setSpeechRate: (r: number) => void
@@ -21,6 +25,9 @@ interface SettingsState {
   setSpeakMode: (m: SpeakMode) => void
   setSpeechVoiceURI: (uri: string) => void
   setSpeechStrictness: (value: number) => void
+  setShowIPA: (v: boolean) => void
+  setShowBatchList: (v: boolean) => void
+  setPronunciationSource: (v: PronunciationSource) => void
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -34,13 +41,19 @@ export const useSettingsStore = create<SettingsState>()(
       autoPlaySound: false,
       speakMode: 'sentence',
       speechStrictness: 0.8,
+      showIPA: true,
+      showBatchList: false,
+      pronunciationSource: 'ipa',
       toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
       setDesktopMode: (m) => set({ desktopMode: m }),
       setSpeechRate: (r) => set({ speechRate: r }),
       setAutoPlaySound: (v) => set({ autoPlaySound: v }),
       setSpeakMode: (m) => set({ speakMode: m }),
       setSpeechVoiceURI: (uri) => set({ speechVoiceURI: uri }),
-      setSpeechStrictness: (value) => set({ speechStrictness: value })
+      setSpeechStrictness: (value) => set({ speechStrictness: value }),
+      setShowIPA: (v) => set({ showIPA: v }),
+      setShowBatchList: (v) => set({ showBatchList: v }),
+      setPronunciationSource: (v) => set({ pronunciationSource: v })
     }),
     { name: 'ai-settings' }
   )

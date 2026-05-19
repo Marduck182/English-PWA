@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Bookmark, Check, Eye, EyeOff, RotateCcw, Volume2, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bookmark, Check, Eye, EyeOff, LayoutList, RotateCcw, Volume2, X } from 'lucide-react'
 import { useWordsStore } from '../store/useWordsStore'
 import { useProgressStore } from '../store/useProgressStore'
 import { useSettingsStore } from '../store/useSettingsStore'
@@ -28,7 +28,10 @@ export function TypingPractice() {
   const [feedback, setFeedback] = useState<'idle' | 'correct' | 'wrong' | 'revealed'>('idle')
   const [wrongCount, setWrongCount] = useState(0)
   const [showSummary, setShowSummary] = useState(false)
-  const [showIPA, setShowIPA] = useState(true)
+  const showIPA = useSettingsStore((s) => s.showIPA)
+  const setShowIPA = useSettingsStore((s) => s.setShowIPA)
+  const showBatchList = useSettingsStore((s) => s.showBatchList)
+  const setShowBatchList = useSettingsStore((s) => s.setShowBatchList)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const advanceTimerRef = useRef<number | null>(null)
   const shakeControls = useAnimationControls()
@@ -241,17 +244,29 @@ export function TypingPractice() {
       : ''
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <button onClick={() => navigate('/')} className="btn-ghost">
-          <ArrowLeft className="h-4 w-4" /> Volver
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => navigate('/')} className="btn-ghost">
+            <ArrowLeft className="h-4 w-4" /> Volver
+          </button>
+          <motion.button
+            onClick={() => setShowBatchList(!showBatchList)}
+            className={`btn-ghost ${showBatchList ? 'text-brand-300' : ''}`}
+            title={showBatchList ? 'Ocultar lista del lote' : 'Ver lista del lote'}
+            whileTap={{ scale: 0.85 }}
+          >
+            <LayoutList className="h-4 w-4" />
+            <span className="hidden sm:inline">{showBatchList ? 'Ocultar' : 'Lista'}</span>
+          </motion.button>
+        </div>
         <div className="text-sm text-slate-400">
           {batch.label} · {position + 1}/{batch.wordIds.length}
         </div>
         <div className="flex items-center gap-2">
           <motion.button
-            onClick={() => setShowIPA((prev) => !prev)}
+            onClick={() => setShowIPA(!showIPA)}
             className="btn-ghost"
             title={showIPA ? 'Ocultar IPA' : 'Mostrar IPA'}
             whileTap={{ scale: 0.85 }}
@@ -278,156 +293,212 @@ export function TypingPractice() {
         </div>
       </div>
 
-      <ProgressBar value={ratio} />
+      {/* Main layout */}
+      <div className="flex items-start gap-4">
+        {/* Left: practice content */}
+        <div className="flex-1 min-w-0 space-y-4">
+          <ProgressBar value={ratio} />
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={word.id}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -12 }}
-          transition={{ duration: 0.18 }}
-          onAnimationComplete={() => {
-            // Final safety net: focus the input once the enter animation completes,
-            // unless the input is disabled (correct/revealed states).
-            if (inputRef.current && !inputRef.current.disabled) {
-              inputRef.current.focus()
-            }
-          }}
-          className="card text-center"
-        >
-          <div className="text-xs uppercase tracking-widest text-slate-400">Español</div>
-          <div className="mt-1 text-3xl font-bold">{word.spanish}</div>
-          {showIPA && word.ipa && <div className="mt-2 font-mono text-lg text-brand-300">{word.ipa}</div>}
-
-          {wrongCount > 0 && wrongCount < MAX_WRONG_BEFORE_REVEAL && (
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={wrongCount}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="mt-4"
-              >
-                <div className="text-[10px] uppercase tracking-widest text-slate-500">Pista</div>
-                <div className="mt-1 font-mono text-xl tracking-widest text-amber-300">
-                  {buildHint(word.english, wrongCount === 1 ? 1 : 2)}
-                </div>
-                <div className="mt-1 text-xs text-slate-500">Intento {wrongCount}/{MAX_WRONG_BEFORE_REVEAL}</div>
-              </motion.div>
-            </AnimatePresence>
-          )}
-
-          <motion.div animate={shakeControls} className="mt-6">
-            <input
-              ref={setInputRef}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value)
-                if (feedback === 'wrong') setFeedback('idle')
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={word.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.18 }}
+              onAnimationComplete={() => {
+                if (inputRef.current && !inputRef.current.disabled) {
+                  inputRef.current.focus()
+                }
               }}
-              placeholder="Escribe la palabra en inglés…"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              autoFocus
-              disabled={inputDisabled}
-              className={`input text-center text-2xl tracking-wide ${inputBorderClass}`}
-            />
-          </motion.div>
+              className="card text-center"
+            >
+              <div className="text-xs uppercase tracking-widest text-slate-400">Español</div>
+              <div className="mt-1 text-3xl font-bold">{word.spanish}</div>
+              {showIPA && word.ipa && <div className="mt-2 font-mono text-lg text-brand-300">{word.ipa}</div>}
 
-          <AnimatePresence>
-            {feedback === 'correct' && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                className="mt-4"
-              >
-                <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-3 py-1.5 text-emerald-300">
-                  <Check className="h-4 w-4" /> ¡Correcto! Avanzando…
-                </div>
-              </motion.div>
-            )}
+              {wrongCount > 0 && wrongCount < MAX_WRONG_BEFORE_REVEAL && (
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={wrongCount}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="mt-4"
+                  >
+                    <div className="text-[10px] uppercase tracking-widest text-slate-500">Pista</div>
+                    <div className="mt-1 font-mono text-xl tracking-widest text-amber-300">
+                      {buildHint(word.english, wrongCount === 1 ? 1 : 2)}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">Intento {wrongCount}/{MAX_WRONG_BEFORE_REVEAL}</div>
+                  </motion.div>
+                </AnimatePresence>
+              )}
 
-            {feedback === 'wrong' && (
-              <motion.div
-                key="wrong"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mt-4"
-              >
-                <div className="inline-flex items-center gap-2 rounded-full bg-rose-500/15 px-3 py-1.5 text-rose-300">
-                  <X className="h-4 w-4" /> Incorrecto, intenta otra vez
-                </div>
+              <motion.div animate={shakeControls} className="mt-6">
+                <input
+                  ref={setInputRef}
+                  value={input}
+                  onChange={(e) => {
+                    setInput(e.target.value)
+                    if (feedback === 'wrong') setFeedback('idle')
+                  }}
+                  placeholder="Escribe la palabra en inglés…"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoFocus
+                  disabled={inputDisabled}
+                  className={`input text-center text-2xl tracking-wide ${inputBorderClass}`}
+                />
               </motion.div>
-            )}
 
-            {feedback === 'revealed' && (
-              <motion.div
-                key="revealed"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="mt-5 space-y-2"
-              >
-                <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/15 px-3 py-1.5 text-amber-300">
-                  <Eye className="h-4 w-4" /> Respuesta
+              <AnimatePresence>
+                {feedback === 'correct' && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="mt-4"
+                  >
+                    <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-3 py-1.5 text-emerald-300">
+                      <Check className="h-4 w-4" /> ¡Correcto! Avanzando…
+                    </div>
+                  </motion.div>
+                )}
+
+                {feedback === 'wrong' && (
+                  <motion.div
+                    key="wrong"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-4"
+                  >
+                    <div className="inline-flex items-center gap-2 rounded-full bg-rose-500/15 px-3 py-1.5 text-rose-300">
+                      <X className="h-4 w-4" /> Incorrecto, intenta otra vez
+                    </div>
+                  </motion.div>
+                )}
+
+                {feedback === 'revealed' && (
+                  <motion.div
+                    key="revealed"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="mt-5 space-y-2"
+                  >
+                    <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/15 px-3 py-1.5 text-amber-300">
+                      <Eye className="h-4 w-4" /> Respuesta
+                    </div>
+                    <div className="text-3xl font-bold text-emerald-300">{word.english}</div>
+                    <div className="text-xs text-slate-400">Marcada como difícil para repaso</div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                {feedback === 'idle' || feedback === 'wrong' ? (
+                  <>
+                    <button onClick={check} className="btn-primary">
+                      <Check className="h-4 w-4" /> Comprobar
+                    </button>
+                    <button onClick={reveal} className="btn-ghost text-sm">
+                      Mostrar respuesta
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => speak(word.english)} className="btn-ghost">
+                      <Volume2 className="h-4 w-4" /> Escuchar
+                    </button>
+                    {feedback === 'revealed' && (
+                      <button onClick={retry} className="btn-secondary">
+                        <RotateCcw className="h-4 w-4" /> Reintentar
+                      </button>
+                    )}
+                    <button onClick={next} className="btn-primary">
+                      {position >= batch.wordIds.length - 1 ? 'Finalizar' : 'Siguiente'} <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {(feedback === 'correct' || feedback === 'revealed') && (word.sentence || word.sentenceSpanish) && (
+                <div className="mt-6 rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-left">
+                  {word.sentence && <div className="text-slate-100">{word.sentence}</div>}
+                  {word.sentenceSpanish && <div className="mt-1 text-sm text-slate-400">{word.sentenceSpanish}</div>}
                 </div>
-                <div className="text-3xl font-bold text-emerald-300">{word.english}</div>
-                <div className="text-xs text-slate-400">Marcada como difícil para repaso</div>
-              </motion.div>
-            )}
+              )}
+            </motion.div>
           </AnimatePresence>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-            {feedback === 'idle' || feedback === 'wrong' ? (
-              <>
-                <button onClick={check} className="btn-primary">
-                  <Check className="h-4 w-4" /> Comprobar
-                </button>
-                <button onClick={reveal} className="btn-ghost text-sm">
-                  Mostrar respuesta
-                </button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => speak(word.english)} className="btn-ghost">
-                  <Volume2 className="h-4 w-4" /> Escuchar
-                </button>
-                {feedback === 'revealed' && (
-                  <button onClick={retry} className="btn-secondary">
-                    <RotateCcw className="h-4 w-4" /> Reintentar
-                  </button>
-                )}
-                <button onClick={next} className="btn-primary">
-                  {position >= batch.wordIds.length - 1 ? 'Finalizar' : 'Siguiente'} <ArrowRight className="h-4 w-4" />
-                </button>
-              </>
-            )}
-          </div>
-
-          {(feedback === 'correct' || feedback === 'revealed') && (word.sentence || word.sentenceSpanish) && (
-            <div className="mt-6 rounded-xl border border-slate-800 bg-slate-950/50 p-4 text-left">
-              {word.sentence && <div className="text-slate-100">{word.sentence}</div>}
-              {word.sentenceSpanish && <div className="mt-1 text-sm text-slate-400">{word.sentenceSpanish}</div>}
+          <div className="flex items-center justify-between">
+            <button onClick={prev} disabled={position === 0} className="btn-secondary">
+              <ArrowLeft className="h-4 w-4" /> Anterior
+            </button>
+            <div className="hidden text-xs text-slate-500 sm:block">
+              Enter · Ctrl+← → navegar · M marcar · Esc salir
             </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
-
-      <div className="flex items-center justify-between">
-        <button onClick={prev} disabled={position === 0} className="btn-secondary">
-          <ArrowLeft className="h-4 w-4" /> Anterior
-        </button>
-        <div className="hidden text-xs text-slate-500 sm:block">
-          Enter · Ctrl+← → navegar · M marcar · Esc salir
+            <button onClick={next} className="btn-secondary">
+              {position >= batch.wordIds.length - 1 ? 'Finalizar' : 'Siguiente'} <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
-        <button onClick={next} className="btn-secondary">
-          {position >= batch.wordIds.length - 1 ? 'Finalizar' : 'Siguiente'} <ArrowRight className="h-4 w-4" />
-        </button>
+
+        {/* Right: batch list panel */}
+        <AnimatePresence>
+          {showBatchList && (
+            <motion.div
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: 'auto' }}
+              exit={{ opacity: 0, width: 0 }}
+              transition={{ duration: 0.22 }}
+              className="overflow-hidden shrink-0"
+            >
+              <div className="card w-56 space-y-1 p-3 max-h-[70vh] overflow-y-auto">
+                <div className="mb-2 text-xs uppercase tracking-widest text-slate-400">
+                  {batch.wordIds.length} palabras
+                </div>
+                {shuffledWordIds.map((id, i) => {
+                  const w = byId.get(id)
+                  if (!w) return null
+                  const hard = progress[id]?.isHard ?? false
+                  const isCurrent = i === position
+                  return (
+                    <div
+                      key={id}
+                      className={`flex items-center justify-between rounded-lg px-2 py-1.5 text-sm transition-colors ${
+                        isCurrent
+                          ? 'bg-brand-500/20 text-brand-200'
+                          : 'text-slate-300 hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="w-4 shrink-0 text-right text-xs text-slate-500">{i + 1}</span>
+                        <span className="truncate">{w.spanish}</span>
+                      </div>
+                      <motion.button
+                        onClick={() => toggleHard(id)}
+                        className={`ml-1 shrink-0 rounded p-1 transition-colors ${
+                          hard
+                            ? 'text-amber-400 hover:text-amber-300'
+                            : 'text-slate-600 hover:text-slate-400'
+                        }`}
+                        title={hard ? 'Quitar difícil' : 'Marcar difícil'}
+                        whileTap={{ scale: 0.8 }}
+                      >
+                        <Bookmark className="h-3 w-3" fill={hard ? 'currentColor' : 'none'} />
+                      </motion.button>
+                    </div>
+                  )
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )

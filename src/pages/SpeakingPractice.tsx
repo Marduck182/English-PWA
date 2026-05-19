@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Bookmark, Mic, MicOff, RotateCcw, Volume2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bookmark, Languages, Loader2, Mic, MicOff, RotateCcw, Volume2 } from 'lucide-react'
 import { useWordsStore } from '../store/useWordsStore'
 import { useProgressStore } from '../store/useProgressStore'
 import { useSettingsStore } from '../store/useSettingsStore'
@@ -11,6 +11,7 @@ import { useShortcuts } from '../hooks/useShortcuts'
 import { ProgressBar } from '../components/ProgressBar'
 import { PracticeSummary } from '../components/PracticeSummary'
 import { shuffleArray } from '../utils/shuffle'
+import { mwToSpanish } from '../utils/mwToSpanish'
 import { sentenceSimilarity, scoreToPercent, scoreLabel } from '../utils/similarity'
 
 export function SpeakingPractice() {
@@ -24,6 +25,8 @@ export function SpeakingPractice() {
   const [score, setScore] = useState<number | null>(null)
   const [showAnswer, setShowAnswer] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
+  const [pronunciation, setPronunciation] = useState<string | null>(null)
+  const [pronunciationLoading, setPronunciationLoading] = useState(false)
   const autoAdvanceTimerRef = useRef<number | null>(null)
 
   const shuffledWordIds = useMemo(() => (batch ? shuffleArray(batch.wordIds) : []), [batch])
@@ -34,6 +37,7 @@ export function SpeakingPractice() {
   const isHard = useProgressStore((s) => s.progress[currentWordId]?.isHard ?? false)
   const speakMode = useSettingsStore((s) => s.speakMode)
   const speechStrictness = useSettingsStore((s) => s.speechStrictness)
+  const pronunciationSource = useSettingsStore((s) => s.pronunciationSource)
   const { speak, speaking, supported: ttsSupported } = useSpeak()
 
   const word = useMemo(() => {
@@ -113,6 +117,8 @@ export function SpeakingPractice() {
   useEffect(() => {
     setScore(null)
     setShowAnswer(false)
+    setPronunciation(null)
+    setPronunciationLoading(false)
     reset()
     stop()
     clearAutoAdvanceTimer()
@@ -244,6 +250,47 @@ export function SpeakingPractice() {
           {speakMode === 'word' && word.ipa && (
             <div className="mt-2 font-mono text-base text-brand-300">{word.ipa}</div>
           )}
+
+          <div className="mt-3 flex justify-center">
+            <motion.button
+              onClick={async () => {
+                if (pronunciation || pronunciationLoading) return
+                // Word mode + IPA source: convert locally (no API call needed)
+                if (speakMode === 'word' && pronunciationSource === 'ipa' && word.ipa) {
+                  setPronunciation(mwToSpanish(word.ipa))
+                  return
+                }
+                // Sentence mode: use Groq API
+                setPronunciationLoading(true)
+                try {
+                  const res = await fetch(`${import.meta.env.VITE_PRONUNCIATION_API_URL}/pronounce`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ word: word.english, sentence: target }),
+                  })
+                  const data = await res.json()
+                  setPronunciation(data.sentence ?? data.word)
+                } finally {
+                  setPronunciationLoading(false)
+                }
+              }}
+              className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                pronunciation
+                  ? 'border-brand-500/40 bg-brand-500/15 text-brand-300'
+                  : 'border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+              }`}
+              title="Ver pronunciación en español"
+              whileTap={{ scale: 0.9 }}
+              disabled={pronunciationLoading}
+            >
+              {pronunciationLoading
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <Languages className="h-4 w-4" />
+              }
+              {pronunciation ?? 'Pronunciación'}
+            </motion.button>
+          </div>
+
           {showAnswer && word.sentenceSpanish && (
             <div className="mt-3 text-sm text-slate-400">{word.sentenceSpanish}</div>
           )}
