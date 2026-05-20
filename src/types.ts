@@ -9,6 +9,7 @@ export interface RawWord {
   ejemplo_en: string
   ejemplo_es: string
   fonetica: string
+  ejemplo_fonetica?: string
 }
 
 // Normalized structure used throughout the app
@@ -19,6 +20,7 @@ export interface Word {
   ipa: string // Merriam-Webster phonetic — kept as-is
   sentence: string
   sentenceSpanish: string
+  sentencePhonetic: string // Spanish phonetic approximation from words.json
   imageFile?: string
   audioPron?: string
   audioExample?: string

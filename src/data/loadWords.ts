@@ -24,6 +24,7 @@ function adapt(raw: RawWord): Word {
     ipa: raw.fonetica?.trim() ?? '',
     sentence: raw.ejemplo_en?.trim() ?? '',
     sentenceSpanish: raw.ejemplo_es?.trim() ?? '',
+    sentencePhonetic: raw.ejemplo_fonetica?.trim() ?? '',
     imageFile: stripHtmlImage(raw.imagen),
     audioPron: raw.audio_pron,
     audioExample: raw.audio_ejemplo

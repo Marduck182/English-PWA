@@ -77,6 +77,8 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
   const [error, setError] = useState<RecognitionError | null>(null)
   const onResultRef = useRef(options.onResult)
   onResultRef.current = options.onResult
+  const retryCountRef = useRef(0)
+  const startRef = useRef<(isAutoRetry?: boolean) => Promise<void>>(async () => {})
 
   const reset = useCallback(() => {
     setTranscript('')
@@ -91,7 +93,8 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
     }
   }, [])
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (isAutoRetry = false) => {
+    if (!isAutoRetry) retryCountRef.current = 0
     setError(null)
     setTranscript('')
     setInterim('')
@@ -186,11 +189,16 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
           })
           break
         case 'network':
-          setError({
-            code: 'network',
-            message: 'El servicio de voz no respondió.',
-            hint: 'Suele pasar de forma aleatoria — intenta de nuevo. Si persiste, desactiva extensiones del navegador temporalmente.'
-          })
+          if (retryCountRef.current < 1) {
+            retryCountRef.current++
+            setTimeout(() => startRef.current(true), 800)
+          } else {
+            setError({
+              code: 'network',
+              message: 'El servicio de voz no respondió.',
+              hint: 'Suele pasar de forma aleatoria — intenta de nuevo. Si persiste, desactiva extensiones del navegador temporalmente.'
+            })
+          }
           break
         case 'aborted':
           // user-initiated, no error
@@ -234,6 +242,10 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
       setListening(false)
     }
   }, [Ctor, lang])
+
+  useEffect(() => {
+    startRef.current = start
+  }, [start])
 
   useEffect(() => {
     return () => recognitionRef.current?.abort()

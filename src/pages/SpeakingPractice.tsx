@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Bookmark, Languages, Loader2, Mic, MicOff, RefreshCw, RotateCcw, Volume2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bookmark, Languages, Mic, RotateCcw, Volume2, Activity } from 'lucide-react'
 import { useWordsStore } from '../store/useWordsStore'
 import { useProgressStore } from '../store/useProgressStore'
 import { useSettingsStore } from '../store/useSettingsStore'
@@ -12,7 +12,6 @@ import { ProgressBar } from '../components/ProgressBar'
 import { PracticeSummary } from '../components/PracticeSummary'
 import { shuffleArray } from '../utils/shuffle'
 import { mwToSpanish } from '../utils/mwToSpanish'
-import { usePronunciationCache } from '../store/usePronunciationCache'
 import { sentenceSimilarity, scoreToPercent, scoreLabel } from '../utils/similarity'
 
 export function SpeakingPractice() {
@@ -27,7 +26,6 @@ export function SpeakingPractice() {
   const [showAnswer, setShowAnswer] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
   const [pronunciation, setPronunciation] = useState<string | null>(null)
-  const [pronunciationLoading, setPronunciationLoading] = useState(false)
   const autoAdvanceTimerRef = useRef<number | null>(null)
 
   // const shuffledWordIds = useMemo(() => (batch ? shuffleArray(batch.wordIds) : []), [batch])
@@ -39,11 +37,7 @@ export function SpeakingPractice() {
   const isHard = useProgressStore((s) => s.progress[currentWordId]?.isHard ?? false)
   const speakMode = useSettingsStore((s) => s.speakMode)
   const speechStrictness = useSettingsStore((s) => s.speechStrictness)
-  const pronunciationSource = useSettingsStore((s) => s.pronunciationSource)
   const autoShowPronunciation = useSettingsStore((s) => s.autoShowPronunciation)
-  const getFromCache = usePronunciationCache((s) => s.getEntry)
-  const saveToCache = usePronunciationCache((s) => s.setEntry)
-  const deleteFromCache = usePronunciationCache((s) => s.deleteEntry)
   const { speak, speaking, supported: ttsSupported } = useSpeak()
 
   const word = useMemo(() => {
@@ -124,40 +118,19 @@ export function SpeakingPractice() {
     setScore(null)
     setShowAnswer(false)
     setPronunciation(null)
-    setPronunciationLoading(false)
     reset()
     stop()
     clearAutoAdvanceTimer()
   }, [position, reset, stop, clearAutoAdvanceTimer])
 
-  const loadPronunciation = useCallback(async (force = false) => {
+  const loadPronunciation = useCallback(() => {
     if (!word) return
-    const textKey = speakMode === 'word' ? word.english : target
-    if (!force) {
-      const cached = getFromCache(textKey)
-      if (cached) { setPronunciation(cached); return }
+    if (speakMode === 'word' && word.ipa) {
+      setPronunciation(mwToSpanish(word.ipa))
+    } else {
+      setPronunciation(word.sentencePhonetic || null)
     }
-    if (!force && speakMode === 'word' && pronunciationSource === 'ipa' && word.ipa) {
-      const result = mwToSpanish(word.ipa)
-      saveToCache(textKey, result)
-      setPronunciation(result)
-      return
-    }
-    setPronunciationLoading(true)
-    try {
-      const res = await fetch(`${import.meta.env.VITE_PRONUNCIATION_API_URL}/pronounce`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: word.english, sentence: target, force }),
-      })
-      const data = await res.json()
-      const result = data.sentence ?? data.word ?? ''
-      saveToCache(textKey, result)
-      setPronunciation(result)
-    } finally {
-      setPronunciationLoading(false)
-    }
-  }, [word, speakMode, target, pronunciationSource, getFromCache, saveToCache])
+  }, [word, speakMode])
 
   useEffect(() => {
     if (autoShowPronunciation && word) loadPronunciation()
@@ -292,7 +265,7 @@ export function SpeakingPractice() {
 
           <div className="mt-3 flex items-center justify-center gap-1">
             <motion.button
-              onClick={() => { if (!pronunciation && !pronunciationLoading) loadPronunciation() }}
+              onClick={() => { if (!pronunciation) loadPronunciation() }}
               className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm transition-colors ${
                 pronunciation
                   ? 'border-brand-500/40 bg-brand-500/15 text-brand-300'
@@ -300,32 +273,11 @@ export function SpeakingPractice() {
               }`}
               title="Ver pronunciación en español"
               whileTap={{ scale: 0.9 }}
-              disabled={pronunciationLoading}
             >
-              {pronunciationLoading
-                ? <Loader2 className="h-4 w-4 animate-spin" />
-                : <Languages className="h-4 w-4" />
-              }
+              <Languages className="h-4 w-4" />
               {pronunciation ?? 'Pronunciación'}
             </motion.button>
 
-            {pronunciation && !pronunciationLoading && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.7 }}
-                animate={{ opacity: 1, scale: 1 }}
-                onClick={() => {
-                  const textKey = speakMode === 'word' ? word.english : target
-                  deleteFromCache(textKey)
-                  setPronunciation(null)
-                  loadPronunciation(true)
-                }}
-                className="rounded-full p-1.5 text-slate-600 hover:bg-slate-800 hover:text-slate-300 transition-colors"
-                title="Volver a procesar pronunciación"
-                whileTap={{ scale: 0.85 }}
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-              </motion.button>
-            )}
           </div>
 
           {showAnswer && word.sentenceSpanish && (
@@ -333,18 +285,21 @@ export function SpeakingPractice() {
           )}
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-            <button
+            <motion.button
               onClick={toggleMic}
               disabled={!supported}
+              whileTap={{ scale: 0.92 }}
               className={`btn h-14 w-14 rounded-full p-0 ${
                 listening
                   ? 'bg-rose-600 text-white hover:bg-rose-500 animate-pulse-soft'
                   : 'bg-brand-600 text-white hover:bg-brand-500'
               }`}
-              aria-label={listening ? 'Detener' : 'Grabar'}
+              aria-label={listening ? 'Detener grabación' : 'Iniciar grabación'}
+              title={listening ? 'Detener grabación' : 'Grabar'
+              }
             >
-              {listening ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
-            </button>
+              {listening ? <Activity className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+            </motion.button>
             <button
               onClick={() => speak(target)}
               disabled={!ttsSupported || speaking}
