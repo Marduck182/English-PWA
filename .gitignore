@@ -11,3 +11,7 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .idea
+/english_batches
+.english_batches/*
+/scripts
+/scripts/*

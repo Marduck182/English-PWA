@@ -265,17 +265,20 @@ export function SpeakingPractice() {
 
           <div className="mt-3 flex items-center justify-center gap-1">
             <motion.button
-              onClick={() => { if (!pronunciation) loadPronunciation() }}
+              onClick={() => {
+                if (autoShowPronunciation) return
+                pronunciation ? setPronunciation(null) : loadPronunciation()
+              }}
               className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm transition-colors ${
                 pronunciation
-                  ? 'border-brand-500/40 bg-brand-500/15 text-brand-300'
+                  ? 'border-brand-500/40 bg-brand-500/15 text-brand-300 hover:bg-brand-500/25 hover:border-brand-500/60'
                   : 'border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'
-              }`}
-              title="Ver pronunciación en español"
-              whileTap={{ scale: 0.9 }}
+              } ${autoShowPronunciation ? 'cursor-default' : ''}`}
+              title={autoShowPronunciation ? 'Pronunciación' : pronunciation ? 'Ocultar pronunciación' : 'Ver pronunciación en español'}
+              whileTap={autoShowPronunciation ? {} : { scale: 0.9 }}
             >
               <Languages className="h-4 w-4" />
-              {pronunciation ?? 'Pronunciación'}
+              {pronunciation || 'Pronunciación'}
             </motion.button>
 
           </div>

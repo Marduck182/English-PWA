@@ -165,8 +165,8 @@ export function Settings() {
 
         <SettingRow
           icon={<Languages className="h-5 w-5 text-slate-400" />}
-          label="Mostrar pronunciación automáticamente"
-          description="Se muestra al cargar cada palabra sin presionar el botón"
+          label="Pronunciación siempre visible"
+          description={autoShowPronunciation ? 'La pronunciación se muestra siempre y no se puede ocultar' : 'La pronunciación se muestra solo al presionar el botón'}
         >
           <Toggle checked={autoShowPronunciation} onChange={setAutoShowPronunciation} />
         </SettingRow>

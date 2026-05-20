@@ -78,6 +78,7 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
   const onResultRef = useRef(options.onResult)
   onResultRef.current = options.onResult
   const retryCountRef = useRef(0)
+  const shouldRestartRef = useRef(false)
   const startRef = useRef<(isAutoRetry?: boolean) => Promise<void>>(async () => {})
 
   const reset = useCallback(() => {
@@ -87,6 +88,7 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
   }, [])
 
   const stop = useCallback(() => {
+    shouldRestartRef.current = false
     if (recognitionRef.current) {
       recognitionRef.current.stop()
       setListening(false)
@@ -95,6 +97,7 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
 
   const start = useCallback(async (isAutoRetry = false) => {
     if (!isAutoRetry) retryCountRef.current = 0
+    shouldRestartRef.current = false
     setError(null)
     setTranscript('')
     setInterim('')
@@ -155,12 +158,25 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
     rec.continuous = true
     rec.maxAlternatives = 1
 
-    rec.onstart = () => setListening(true)
-    rec.onend = () => setListening(false)
+    rec.onstart = () => {
+      setListening(true)
+      shouldRestartRef.current = true
+    }
+    rec.onend = () => {
+      setListening(false)
+      if (shouldRestartRef.current) {
+        // Browser stopped silently (pause, no-speech timeout, etc.) — restart transparently
+        const capturedRef = shouldRestartRef
+        setTimeout(() => {
+          if (capturedRef.current) startRef.current(true)
+        }, 300)
+      }
+    }
     rec.onerror = (ev: SpeechRecognitionErrorEvent) => {
       setListening(false)
       switch (ev.error) {
         case 'not-allowed':
+          shouldRestartRef.current = false
           setError({
             code: 'permission',
             message: 'Permiso de micrófono denegado.',
@@ -168,6 +184,7 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
           })
           break
         case 'service-not-allowed':
+          shouldRestartRef.current = false
           setError({
             code: 'service',
             message: 'El navegador bloqueó el servicio de reconocimiento.',
@@ -175,13 +192,10 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
           })
           break
         case 'no-speech':
-          setError({
-            code: 'no-speech',
-            message: 'No te escuché.',
-            hint: 'Acerca el micrófono o habla un poco más fuerte.'
-          })
+          // Let onend handle the restart silently — no error shown
           break
         case 'audio-capture':
+          shouldRestartRef.current = false
           setError({
             code: 'audio-capture',
             message: 'No se pudo capturar audio.',
@@ -189,7 +203,9 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
           })
           break
         case 'network':
-          if (retryCountRef.current < 1) {
+          // Prevent double-restart: onend will fire after this, but shouldRestart will be false
+          shouldRestartRef.current = false
+          if (retryCountRef.current < 2) {
             retryCountRef.current++
             setTimeout(() => startRef.current(true), 800)
           } else {
@@ -201,9 +217,10 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
           }
           break
         case 'aborted':
-          // user-initiated, no error
+          shouldRestartRef.current = false
           break
         default:
+          shouldRestartRef.current = false
           setError({
             code: 'unknown',
             message: `Error: ${ev.error}`,
@@ -248,7 +265,10 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
   }, [start])
 
   useEffect(() => {
-    return () => recognitionRef.current?.abort()
+    return () => {
+      shouldRestartRef.current = false
+      recognitionRef.current?.abort()
+    }
   }, [])
 
   return { start, stop, reset, listening, transcript, interim, error, supported }
