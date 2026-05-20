@@ -1,12 +1,13 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Bookmark, Languages, Mic, RotateCcw, Volume2, Activity } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bookmark, Languages, Mic, RotateCcw, Volume2, Activity, Loader2 } from 'lucide-react'
 import { useWordsStore } from '../store/useWordsStore'
 import { useProgressStore } from '../store/useProgressStore'
 import { useSettingsStore } from '../store/useSettingsStore'
 import { useSpeak } from '../hooks/useSpeak'
 import { useRecognize } from '../hooks/useRecognize'
+import { useWhisper } from '../hooks/useWhisper'
 import { useShortcuts } from '../hooks/useShortcuts'
 import { ProgressBar } from '../components/ProgressBar'
 import { PracticeSummary } from '../components/PracticeSummary'
@@ -28,8 +29,7 @@ export function SpeakingPractice() {
   const [pronunciation, setPronunciation] = useState<string | null>(null)
   const autoAdvanceTimerRef = useRef<number | null>(null)
 
-  // const shuffledWordIds = useMemo(() => (batch ? shuffleArray(batch.wordIds) : []), [batch])
-  const shuffledWordIds = useMemo(() => (batch ? batch.wordIds : []), [batch])
+  const shuffledWordIds = useMemo(() => (batch ? shuffleArray(batch.wordIds) : []), [batch])
   const currentWordId = shuffledWordIds[position] ?? -1
 
   const recordSpeaking = useProgressStore((s) => s.recordSpeaking)
@@ -38,6 +38,8 @@ export function SpeakingPractice() {
   const speakMode = useSettingsStore((s) => s.speakMode)
   const speechStrictness = useSettingsStore((s) => s.speechStrictness)
   const autoShowPronunciation = useSettingsStore((s) => s.autoShowPronunciation)
+  const sttSource = useSettingsStore((s) => s.sttSource)
+  const groqApiKey = useSettingsStore((s) => s.groqApiKey)
   const { speak, speaking, supported: ttsSupported } = useSpeak()
 
   const word = useMemo(() => {
@@ -104,13 +106,17 @@ export function SpeakingPractice() {
       recordSpeaking(word.id, s)
       if (s >= speechStrictness) {
         clearAutoAdvanceTimer()
-        autoAdvanceTimerRef.current = window.setTimeout(next, 500)
+        autoAdvanceTimerRef.current = window.setTimeout(next, 3000)
       }
     },
     [word, target, recordSpeaking, next, clearAutoAdvanceTimer]
   )
 
-  const { start, stop, reset, listening, transcript, interim, error, supported } = useRecognize({ onResult })
+  const recognize = useRecognize({ onResult })
+  const whisper = useWhisper({ onResult }, groqApiKey)
+  const activeStt = sttSource === 'whisper' ? whisper : recognize
+  const { start, stop, reset, listening, transcript, interim, error, supported } = activeStt
+  const loading = sttSource === 'whisper' ? whisper.loading : false
 
   useEffect(() => clearAutoAdvanceTimer, [clearAutoAdvanceTimer])
 
@@ -290,18 +296,23 @@ export function SpeakingPractice() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
             <motion.button
               onClick={toggleMic}
-              disabled={!supported}
+              disabled={!supported || loading}
               whileTap={{ scale: 0.92 }}
               className={`btn h-14 w-14 rounded-full p-0 ${
-                listening
+                loading
+                  ? 'bg-amber-500 text-white cursor-wait'
+                  : listening
                   ? 'bg-rose-600 text-white hover:bg-rose-500 animate-pulse-soft'
                   : 'bg-brand-600 text-white hover:bg-brand-500'
               }`}
-              aria-label={listening ? 'Detener grabación' : 'Iniciar grabación'}
-              title={listening ? 'Detener grabación' : 'Grabar'
-              }
+              aria-label={loading ? 'Procesando…' : listening ? 'Detener grabación' : 'Iniciar grabación'}
+              title={loading ? 'Procesando…' : listening ? 'Detener grabación' : 'Grabar'}
             >
-              {listening ? <Activity className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+              {loading
+                ? <Loader2 className="h-6 w-6 animate-spin" />
+                : listening
+                ? <Activity className="h-6 w-6" />
+                : <Mic className="h-6 w-6" />}
             </motion.button>
             <button
               onClick={() => speak(target)}
@@ -372,7 +383,9 @@ export function SpeakingPractice() {
           <ArrowLeft className="h-4 w-4" /> Anterior
         </button>
         <div className="hidden text-xs text-slate-500 sm:block">
-          Enter grabar · Espacio escuchar · ← → navegar · M marcar
+          {sttSource === 'whisper'
+            ? 'Enter iniciar · Enter detener y transcribir · Espacio escuchar · ← → navegar'
+            : 'Enter grabar · Espacio escuchar · ← → navegar · M marcar'}
         </div>
         <button onClick={next} className="btn-secondary">
           {position >= batch.wordIds.length - 1 ? 'Finalizar' : 'Siguiente'} <ArrowRight className="h-4 w-4" />

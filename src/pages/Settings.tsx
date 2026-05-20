@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Moon, Sun, Volume2, Download, Upload, CheckCircle2, AlertCircle, MessageSquareText, Type, Gauge, Languages, Play, UserRound } from 'lucide-react'
+import { Moon, Sun, Volume2, Download, Upload, CheckCircle2, AlertCircle, MessageSquareText, Type, Gauge, Languages, Play, UserRound, Mic, Eye, EyeOff } from 'lucide-react'
 import { useSettingsStore } from '../store/useSettingsStore'
 import { useProgressStore } from '../store/useProgressStore'
 import type { WordProgress } from '../store/useProgressStore'
@@ -23,6 +23,11 @@ export function Settings() {
   const setPronunciationSource = useSettingsStore((s) => s.setPronunciationSource)
   const autoShowPronunciation = useSettingsStore((s) => s.autoShowPronunciation)
   const setAutoShowPronunciation = useSettingsStore((s) => s.setAutoShowPronunciation)
+  const sttSource = useSettingsStore((s) => s.sttSource)
+  const setSttSource = useSettingsStore((s) => s.setSttSource)
+  const groqApiKey = useSettingsStore((s) => s.groqApiKey)
+  const setGroqApiKey = useSettingsStore((s) => s.setGroqApiKey)
+  const [showApiKey, setShowApiKey] = useState(false)
 
   const { voices, speak } = useSpeak()
   const englishVoices = voices.filter((v) => v.lang.startsWith('en'))
@@ -95,6 +100,74 @@ export function Settings() {
         >
           <Toggle checked={autoPlaySound} onChange={setAutoPlaySound} />
         </SettingRow>
+      </div>
+
+      <div className="card space-y-1">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400">Reconocimiento de voz</h2>
+        <SettingRow
+          icon={<Mic className="h-5 w-5 text-slate-400" />}
+          label="Motor de reconocimiento"
+          description={
+            sttSource === 'whisper'
+              ? 'Groq Whisper — graba y envía el audio a Groq para transcribir'
+              : 'Web Speech API — nativo del navegador, tiempo real'
+          }
+        >
+          <div className="flex gap-1 rounded-lg bg-slate-800 p-1">
+            <button
+              onClick={() => setSttSource('webspeech')}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                sttSource === 'webspeech'
+                  ? 'bg-brand-600 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Navegador
+            </button>
+            <button
+              onClick={() => setSttSource('whisper')}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                sttSource === 'whisper'
+                  ? 'bg-brand-600 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Groq Whisper
+            </button>
+          </div>
+        </SettingRow>
+
+        {sttSource === 'whisper' && (
+          <>
+            <div className="border-t border-slate-800/60" />
+            <div className="py-3">
+              <div className="mb-2 text-sm font-medium">API key de Groq</div>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type={showApiKey ? 'text' : 'password'}
+                    value={groqApiKey}
+                    onChange={(e) => setGroqApiKey(e.target.value)}
+                    placeholder="gsk_..."
+                    className="input w-full pr-10 font-mono text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  >
+                    {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <p className="mt-1.5 text-xs text-slate-500">
+                Obtén tu key gratis en{' '}
+                <span className="font-mono text-brand-400">console.groq.com</span>
+                . Se guarda solo en este dispositivo.
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="card space-y-1">

@@ -5,6 +5,7 @@ export type Theme = 'dark' | 'light'
 export type DesktopMode = 'typing' | 'speaking'
 export type SpeakMode = 'word' | 'sentence'
 export type PronunciationSource = 'ipa' | 'ai'
+export type SttSource = 'webspeech' | 'whisper'
 
 interface SettingsState {
   theme: Theme
@@ -19,6 +20,8 @@ interface SettingsState {
   showBatchList: boolean
   pronunciationSource: PronunciationSource
   autoShowPronunciation: boolean
+  sttSource: SttSource
+  groqApiKey: string
   toggleTheme: () => void
   setDesktopMode: (m: DesktopMode) => void
   setSpeechRate: (r: number) => void
@@ -30,6 +33,8 @@ interface SettingsState {
   setShowBatchList: (v: boolean) => void
   setPronunciationSource: (v: PronunciationSource) => void
   setAutoShowPronunciation: (v: boolean) => void
+  setSttSource: (v: SttSource) => void
+  setGroqApiKey: (v: string) => void
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -47,6 +52,8 @@ export const useSettingsStore = create<SettingsState>()(
       showBatchList: false,
       pronunciationSource: 'ipa',
       autoShowPronunciation: false,
+      sttSource: 'webspeech',
+      groqApiKey: '',
       toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
       setDesktopMode: (m) => set({ desktopMode: m }),
       setSpeechRate: (r) => set({ speechRate: r }),
@@ -57,7 +64,9 @@ export const useSettingsStore = create<SettingsState>()(
       setShowIPA: (v) => set({ showIPA: v }),
       setShowBatchList: (v) => set({ showBatchList: v }),
       setPronunciationSource: (v) => set({ pronunciationSource: v }),
-      setAutoShowPronunciation: (v) => set({ autoShowPronunciation: v })
+      setAutoShowPronunciation: (v) => set({ autoShowPronunciation: v }),
+      setSttSource: (v) => set({ sttSource: v }),
+      setGroqApiKey: (v) => set({ groqApiKey: v })
     }),
     { name: 'ai-settings' }
   )
