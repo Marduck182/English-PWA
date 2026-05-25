@@ -79,6 +79,7 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
   onResultRef.current = options.onResult
   const retryCountRef = useRef(0)
   const shouldRestartRef = useRef(false)
+  const lastFinalRef = useRef('')
   const startRef = useRef<(isAutoRetry?: boolean) => Promise<void>>(async () => {})
 
   const reset = useCallback(() => {
@@ -98,6 +99,7 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
   const start = useCallback(async (isAutoRetry = false) => {
     if (!isAutoRetry) retryCountRef.current = 0
     shouldRestartRef.current = false
+    lastFinalRef.current = ''
     setError(null)
     setTranscript('')
     setInterim('')
@@ -155,7 +157,7 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
     const rec = new Ctor()
     rec.lang = lang
     rec.interimResults = true
-    rec.continuous = true
+    rec.continuous = false
     rec.maxAlternatives = 1
 
     rec.onstart = () => {
@@ -229,18 +231,26 @@ export function useRecognize(options: UseRecognizeOptions = {}) {
       }
     }
     rec.onresult = (ev: SpeechRecognitionEvent) => {
-      let finalText = ''
+      // Rebuild full transcript from all results to avoid duplication on mobile
+      // (Chrome mobile sometimes resets ev.resultIndex to 0 mid-session)
+      let allFinals = ''
       let interimText = ''
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      for (let i = 0; i < ev.results.length; i++) {
         const r = ev.results[i]
-        const text = r[0].transcript
-        if (r.isFinal) finalText += text
-        else interimText += text
+        if (r.isFinal) allFinals += r[0].transcript + ' '
+        else interimText += r[0].transcript
       }
-      if (finalText) {
-        setTranscript((t) => (t + ' ' + finalText).trim())
+
+      const finalTrimmed = allFinals.trim()
+      if (finalTrimmed) {
+        shouldRestartRef.current = false
+        setTranscript(finalTrimmed)
         setInterim('')
-        onResultRef.current?.(finalText.trim(), true)
+        // Only fire onResult when we have genuinely new final text
+        if (finalTrimmed !== lastFinalRef.current) {
+          lastFinalRef.current = finalTrimmed
+          onResultRef.current?.(finalTrimmed, true)
+        }
       }
       if (interimText) {
         setInterim(interimText)
