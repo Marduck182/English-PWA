@@ -196,17 +196,11 @@ export function TypingPractice() {
   )
   useShortcuts(shortcuts, ['enter', 'ctrl+arrowright', 'ctrl+arrowleft', 'ctrl+m'])
 
-  if (!loaded) return <div className="text-slate-400">Cargando…</div>
-  if (!batch) {
-    return (
-      <div className="card">
-        Lote no encontrado.{' '}
-        <button onClick={() => navigate('/')} className="btn-primary mt-3">
-          Volver
-        </button>
-      </div>
-    )
-  }
+  useEffect(() => {
+    if (loaded && !batch) navigate('/', { replace: true })
+  }, [loaded, batch, navigate])
+
+  if (!loaded || !batch) return null
 
   if (showSummary && summary) {
     return (
